@@ -1,0 +1,6 @@
+{
+  "name": "Space Mission Control",
+  "description": "Live dashboard tracking astronauts, upcoming space missions, and satellite metrics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
