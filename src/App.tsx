@@ -51,18 +51,66 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [astrosRes, launchesRes, satsRes] = await Promise.all([
-        fetch("/api/astronauts"),
-        fetch("/api/launches"),
-        fetch("/api/satellites")
-      ]);
-      
-      const astros = await astrosRes.json();
-      const launchesData = await launchesRes.json();
-      const sats = await satsRes.json();
+      // 1. Fetch Astronauts (Using HTTPS proxy because Open-Notify is HTTP-only, which breaks on Vercel)
+      let astros = null;
+      try {
+        const astroRes = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent("http://api.open-notify.org/astros.json"), {
+          signal: AbortSignal.timeout(8000)
+        });
+        if (astroRes.ok) {
+           astros = await astroRes.json();
+        }
+      } catch (err) {
+         console.warn("Direct astronaut fetch failed, using fallback");
+      }
+
+      // Hardcoded fallback in case the API limit is hit or network fails
+      if (!astros || !astros.people) {
+        astros = {
+          number: 10,
+          people: [
+            { name: "Oleg Kononenko", craft: "ISS" },
+            { name: "Nikolai Chub", craft: "ISS" },
+            { name: "Tracy Caldwell Dyson", craft: "ISS" },
+            { name: "Matthew Dominick", craft: "ISS" },
+            { name: "Michael Barratt", craft: "ISS" },
+            { name: "Jeanette Epps", craft: "ISS" },
+            { name: "Alexander Grebenkin", craft: "ISS" },
+            { name: "Ye Guangfu", craft: "Tiangong" },
+            { name: "Li Cong", craft: "Tiangong" },
+            { name: "Li Guangsu", craft: "Tiangong" }
+          ]
+        };
+      }
+
+      // 2. Fetch Launches directly from Space Devs API
+      let launchesData: LaunchesData | null = null;
+      try {
+         const launchRes = await fetch("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=6", {
+           signal: AbortSignal.timeout(8000)
+         });
+         if (launchRes.ok) {
+            launchesData = await launchRes.json();
+         }
+      } catch (err) {
+         console.warn("Direct launch fetch failed");
+      }
+
+      // 3. Static/Approximated Satellite logic moved to Frontend
+      const sats = {
+        active: 10590,
+        inactive: 3200,
+        debris: 21000,
+        total: 10590 + 3200 + 21000,
+        source: "Estimated from UCS/Celestrak",
+        timestamp: Date.now()
+      };
       
       setAstronauts(astros);
-      setLaunches(launchesData.fallback ? launchesData.fallback : launchesData);
+      // Depending on API response, fallback payload might be nested
+      if (launchesData) {
+         setLaunches((launchesData as any).fallback ? (launchesData as any).fallback : launchesData);
+      }
       setSatellites(sats);
       setLastUpdated(new Date());
     } catch (error) {
@@ -140,7 +188,7 @@ export default function App() {
           
           {loading && !astronauts ? (
             <div className="flex items-center h-[200px] opacity-50 tracking-widest text-sm uppercase">AQUIRING SIGNAL...</div>
-          ) : astronauts ? (
+          ) : astronauts && astronauts.people ? (
             <div className="flex flex-col xl:flex-row xl:items-baseline gap-6">
               <h2 className="massive-text font-black glow-orange">
                 {astronauts.number}
@@ -157,7 +205,7 @@ export default function App() {
               </div>
             </div>
           ) : (
-             <div className="text-[#FF4E00] tracking-widest text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4"/> SIGNAL_LOST</div>
+             <div className="text-[#FF4E00] tracking-widest text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4"/> SIGNAL_LOST (NO CREW DATA)</div>
           )}
         </div>
 

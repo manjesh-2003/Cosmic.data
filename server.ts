@@ -21,7 +21,9 @@ async function startServer() {
         return res.json(cache.astronauts.data);
       }
       
-      const response = await fetch("http://api.open-notify.org/astros.json");
+      const response = await fetch("http://api.open-notify.org/astros.json", {
+        signal: AbortSignal.timeout(5000)
+      });
       if (!response.ok) throw new Error("Failed to fetch astronauts");
       
       const data = await response.json();
@@ -31,7 +33,24 @@ async function startServer() {
       res.json(data);
     } catch (error) {
       console.error("Astronaut API Error:", error);
-      res.status(500).json({ error: "Failed to fetch astronaut data", fallback: cache.astronauts.data });
+      // Fallback data in case the public API fails/times out
+      const fallbackData = cache.astronauts.data || {
+        number: 10,
+        message: "success (fallback)",
+        people: [
+          { name: "Oleg Kononenko", craft: "ISS" },
+          { name: "Nikolai Chub", craft: "ISS" },
+          { name: "Tracy Caldwell Dyson", craft: "ISS" },
+          { name: "Matthew Dominick", craft: "ISS" },
+          { name: "Michael Barratt", craft: "ISS" },
+          { name: "Jeanette Epps", craft: "ISS" },
+          { name: "Alexander Grebenkin", craft: "ISS" },
+          { name: "Ye Guangfu", craft: "Tiangong" },
+          { name: "Li Cong", craft: "Tiangong" },
+          { name: "Li Guangsu", craft: "Tiangong" }
+        ]
+      };
+      res.json(fallbackData);
     }
   });
 
